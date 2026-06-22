@@ -39,7 +39,10 @@ Outputs:
 
 ## Usage
 
-See [docs/rekordbox-my-tags-guide.md](docs/rekordbox-my-tags-guide.md).
+- **[Connecting to Rekordbox](docs/rekordbox-connection.md)** — database path, settings, troubleshooting
+- **[My Tags workflow](docs/rekordbox-my-tags-guide.md)** — tagging categories, USB export, club gear
+
+Open **Settings** in the app to verify your `master.db` path and test the connection.
 
 **Important:** Close Rekordbox before clicking **Write to Rekordbox**.
 

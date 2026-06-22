@@ -2,14 +2,16 @@ mod analysis;
 mod export;
 mod rekordbox;
 mod session;
+mod settings;
 mod types;
 
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use rekordbox::backup::backup_master_db;
 use rekordbox::content::{filter_missing_group, filter_untagged, load_tag_ids_for_tracks, load_tracks, search_tracks};
-use rekordbox::db::{detect_master_db_path, mark_my_tag_merge_needed, open_database, repair_song_my_tag_rows, sync_agent_registry, DatabaseMode, DbError};
+use rekordbox::db::{mark_my_tag_merge_needed, open_database, repair_song_my_tag_rows, sync_agent_registry, DatabaseMode, DbError};
 use rekordbox::demo::demo_library;
 use rekordbox::my_tags::{
     add_custom_subtag, apply_tag_pack, commit_changes, delete_custom_subtag, load_tag_groups,
@@ -18,6 +20,7 @@ use rekordbox::my_tags::{
 use rekordbox::playlists::{filter_by_playlist, load_playlists, sort_tracks};
 use rekordbox::process::{is_rekordbox_running, rekordbox_write_block_reason};
 use session::TagSession;
+use settings::{test_db_connection as probe_db_connection, AppSettings, DbConnectionTest, SettingsView};
 use tauri::State;
 use types::{
     CommitSummary, LibraryState, MyTagDef, PendingChange, RekordboxStatus, TagGroup, TagPack,
@@ -30,18 +33,68 @@ struct AppState {
     demo_mode: Mutex<bool>,
     playlist_tracks: Mutex<HashMap<String, HashSet<String>>>,
     write_lock: Mutex<()>,
+    settings: Mutex<AppSettings>,
 }
 
-#[tauri::command]
-fn get_rekordbox_status() -> RekordboxStatus {
+fn resolve_db_path(state: &AppState) -> Option<PathBuf> {
+    state.settings.lock().unwrap().resolve_master_db_path()
+}
+
+fn rekordbox_status(state: &AppState) -> RekordboxStatus {
     let running = is_rekordbox_running();
-    let db_path = detect_master_db_path();
+    let settings = state.settings.lock().unwrap();
+    let db_path = settings.resolve_master_db_path();
+    let custom = settings
+        .custom_master_db_path
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
     RekordboxStatus {
         running,
         db_path: db_path.as_ref().map(|p| p.display().to_string()),
         db_found: db_path.is_some(),
         demo_mode: db_path.is_none(),
+        default_db_path: settings::default_master_db_path().map(|p| p.display().to_string()),
+        custom_db_path: custom.clone(),
+        using_custom_path: custom.is_some(),
     }
+}
+
+#[tauri::command]
+fn get_rekordbox_status(state: State<'_, AppState>) -> RekordboxStatus {
+    rekordbox_status(&state)
+}
+
+#[tauri::command]
+fn get_settings(state: State<'_, AppState>) -> SettingsView {
+    state.settings.lock().unwrap().to_view()
+}
+
+#[tauri::command]
+fn save_settings(
+    custom_master_db_path: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<SettingsView, String> {
+    let normalized = custom_master_db_path.and_then(|p| {
+        let trimmed = p.trim().to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    });
+    {
+        let mut settings = state.settings.lock().unwrap();
+        settings.custom_master_db_path = normalized;
+        settings.save()?;
+    }
+    Ok(state.settings.lock().unwrap().to_view())
+}
+
+#[tauri::command]
+fn test_db_connection(path: String) -> DbConnectionTest {
+    probe_db_connection(&path)
 }
 
 #[tauri::command]
@@ -57,7 +110,7 @@ fn get_library(state: State<'_, AppState>) -> Result<LibraryState, String> {
 #[tauri::command]
 fn load_library(state: State<'_, AppState>) -> Result<LibraryState, String> {
     let running = is_rekordbox_running();
-    let db_path = detect_master_db_path();
+    let db_path = resolve_db_path(&state);
 
     let (db_path_str, demo_mode, groups, tracks, playlists, playlist_tracks) =
         if let Some(path) = db_path {
@@ -118,7 +171,7 @@ fn apply_default_tag_pack(state: State<'_, AppState>) -> Result<Vec<TagGroup>, S
     if let Some(reason) = rekordbox_write_block_reason() {
         return Err(reason);
     }
-    let path = detect_master_db_path().ok_or_else(|| {
+    let path = resolve_db_path(&state).ok_or_else(|| {
         "Rekordbox database not found. Demo mode cannot write schema.".to_string()
     })?;
     let pack: TagPack = get_default_tag_pack()?;
@@ -243,7 +296,7 @@ fn write_changes_to_db(
         lib.groups.clone()
     };
 
-    let path = detect_master_db_path().ok_or_else(|| {
+    let path = resolve_db_path(state).ok_or_else(|| {
         "Rekordbox database not found — demo mode cannot commit".to_string()
     })?;
 
@@ -390,7 +443,7 @@ fn create_custom_tag(
     let mut lib_guard = state.library.lock().unwrap();
     let lib = lib_guard.as_mut().ok_or("Library not loaded")?;
 
-    ensure_custom_tag(lib, &group_id, &name)
+    ensure_custom_tag(lib, &group_id, &name, resolve_db_path(&state))
 }
 
 #[tauri::command]
@@ -409,8 +462,7 @@ fn delete_custom_tag(tag_id: String, state: State<'_, AppState>) -> Result<Vec<T
         return Ok(lib.groups.clone());
     }
 
-    let path = detect_master_db_path()
-        .ok_or("Rekordbox database not found".to_string())?;
+    let path = resolve_db_path(&state).ok_or("Rekordbox database not found".to_string())?;
     backup_master_db(&path).map_err(|e| e.to_string())?;
     let db = open_database(&path, DatabaseMode::ReadWrite).map_err(|e| e.to_string())?;
     delete_custom_subtag(&db, &tag_id).map_err(|e| e.to_string())?;
@@ -418,7 +470,12 @@ fn delete_custom_tag(tag_id: String, state: State<'_, AppState>) -> Result<Vec<T
     Ok(lib.groups.clone())
 }
 
-fn ensure_custom_tag(lib: &mut LibraryState, group_id: &str, name: &str) -> Result<MyTagDef, String> {
+fn ensure_custom_tag(
+    lib: &mut LibraryState,
+    group_id: &str,
+    name: &str,
+    db_path: Option<PathBuf>,
+) -> Result<MyTagDef, String> {
     if let Some(existing) = lib.groups.iter().find_map(|g| {
         if g.id == group_id {
             g.tags
@@ -454,7 +511,7 @@ fn ensure_custom_tag(lib: &mut LibraryState, group_id: &str, name: &str) -> Resu
         return Err(reason);
     }
 
-    let path = detect_master_db_path().ok_or("Rekordbox database not found".to_string())?;
+    let path = db_path.ok_or("Rekordbox database not found".to_string())?;
     backup_master_db(&path).map_err(|e| e.to_string())?;
     let db = open_database(&path, DatabaseMode::ReadWrite).map_err(|e| e.to_string())?;
     let def = add_custom_subtag(&db, group_id, name).map_err(|e| format_db_error(e))?;
@@ -625,9 +682,13 @@ pub fn run() {
             demo_mode: Mutex::new(false),
             playlist_tracks: Mutex::new(HashMap::new()),
             write_lock: Mutex::new(()),
+            settings: Mutex::new(AppSettings::load()),
         })
         .invoke_handler(tauri::generate_handler![
             get_rekordbox_status,
+            get_settings,
+            save_settings,
+            test_db_connection,
             load_library,
             get_library,
             get_default_tag_pack,

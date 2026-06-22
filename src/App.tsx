@@ -6,9 +6,11 @@ import { LibraryTable } from "./components/LibraryTable";
 import { MyTagPanel } from "./components/MyTagPanel";
 import { RekordboxStatusBar } from "./components/RekordboxStatus";
 import { TagSchemaEditor } from "./components/TagSchemaEditor";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { SuggestionsPanel } from "./components/SuggestionsPanel";
 import type {
   LibraryState,
+  RekordboxStatus,
   SortColumn,
   SortDirection,
   TagSuggestion,
@@ -34,6 +36,8 @@ function App() {
   const [suggesting, setSuggesting] = useState(false);
   const [writing, setWriting] = useState(false);
   const [reloading, setReloading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [rekordboxStatus, setRekordboxStatus] = useState<RekordboxStatus | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -68,6 +72,7 @@ function App() {
       api
         .getRekordboxStatus()
         .then((status) => {
+          setRekordboxStatus(status);
           setLibrary((lib) =>
             lib
               ? {
@@ -359,7 +364,11 @@ function App() {
         <p>Rekordbox My Tag accelerator</p>
       </header>
 
-      <RekordboxStatusBar onReload={handleReload} reloading={reloading} />
+      <RekordboxStatusBar
+        onReload={handleReload}
+        reloading={reloading}
+        onOpenSettings={() => setShowSettings(true)}
+      />
 
       {error && <div className="error-banner">{error}</div>}
 
@@ -403,6 +412,9 @@ function App() {
             </option>
           ))}
         </select>
+        <button type="button" onClick={() => setShowSettings(true)}>
+          Settings
+        </button>
         <button type="button" onClick={() => setShowSchema(true)}>
           Manage tags
         </button>
@@ -470,6 +482,14 @@ function App() {
           )}
         </aside>
       </main>
+
+      {showSettings && (
+        <SettingsPanel
+          status={rekordboxStatus}
+          onClose={() => setShowSettings(false)}
+          onSaved={load}
+        />
+      )}
 
       {showSchema && library && (
         <TagSchemaEditor

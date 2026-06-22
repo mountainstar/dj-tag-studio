@@ -4,8 +4,9 @@ DJ Tag Studio writes directly to Rekordbox **My Tags** in `master.db`. These tag
 
 ## Workflow
 
-1. **Close Rekordbox** before writing tags.
-2. Open **DJ Tag Studio** — it loads your library from `master.db`.
+1. **Connect** — see [rekordbox-connection.md](rekordbox-connection.md) or **Settings** in the app.
+2. **Close Rekordbox** before writing tags.
+3. Open **DJ Tag Studio** — it loads your library from `master.db`.
 3. Tag tracks using the 4-group panel or **Auto-suggest**.
 4. Click **Write to Rekordbox** — a backup of `master.db` is created automatically.
 5. Open Rekordbox — tags appear in the My Tag panel.
@@ -33,6 +34,8 @@ When plugging a USB drive into a different computer, Rekordbox may ask **"Sync w
 Track Filter → **MY TAG** tab shows the same 4 groups. AND logic applies across groups; OR logic within a group.
 
 ## Database location
+
+See **[rekordbox-connection.md](rekordbox-connection.md)** for default paths, custom paths, and troubleshooting.
 
 - **macOS:** `~/Library/Pioneer/rekordbox/master.db`
 - **Windows:** `%APPDATA%\Pioneer\rekordbox\master.db`

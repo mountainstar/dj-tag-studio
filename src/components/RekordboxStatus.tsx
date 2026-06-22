@@ -5,9 +5,10 @@ import type { RekordboxStatus } from "../types";
 type Props = {
   onReload?: () => void;
   reloading?: boolean;
+  onOpenSettings?: () => void;
 };
 
-export function RekordboxStatusBar({ onReload, reloading = false }: Props) {
+export function RekordboxStatusBar({ onReload, reloading = false, onOpenSettings }: Props) {
   const [status, setStatus] = useState<RekordboxStatus | null>(null);
 
   useEffect(() => {
@@ -24,7 +25,14 @@ export function RekordboxStatusBar({ onReload, reloading = false }: Props) {
     <div className={`status-bar ${status.running ? "warn" : "ok"}`}>
       <span className="status-dot" />
       {status.demo_mode && (
-        <span>Demo mode — Rekordbox library not found. Showing sample tracks.</span>
+        <span>
+          Demo mode — Rekordbox library not found.{" "}
+          {onOpenSettings && (
+            <button type="button" className="status-link" onClick={onOpenSettings}>
+              Open Settings
+            </button>
+          )}
+        </span>
       )}
       {!status.demo_mode && status.running && (
         <span>Rekordbox is running — read-only until you close it.</span>

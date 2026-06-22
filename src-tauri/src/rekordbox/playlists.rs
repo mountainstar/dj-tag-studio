@@ -4,6 +4,11 @@ use crate::types::{Playlist, Track};
 
 use super::db::{DbError, RekordboxDb};
 
+/// Rekordbox `djmdPlaylist.Attribute` values (pyrekordbox / reklawdbox).
+const ATTR_PLAYLIST: i64 = 0;
+const ATTR_FOLDER: i64 = 1;
+const ATTR_SMART_PLAYLIST: i64 = 4;
+
 struct RawPlaylist {
     id: String,
     name: String,
@@ -58,7 +63,7 @@ pub fn load_playlists(db: &RekordboxDb) -> Result<(Vec<Playlist>, HashMap<String
     let by_id: HashMap<String, &RawPlaylist> = rows.iter().map(|p| (p.id.clone(), p)).collect();
     let mut playlists: Vec<Playlist> = rows
         .iter()
-        .filter(|p| p.attribute != 1)
+        .filter(|p| is_user_playlist(p.attribute))
         .map(|p| {
             let track_count = membership.get(&p.id).map(|s| s.len()).unwrap_or(0);
             Playlist {
@@ -89,7 +94,7 @@ fn build_playlist_path(playlist: &RawPlaylist, by_id: &HashMap<String, &RawPlayl
     while !parent_id.is_empty() && guard < 32 {
         guard += 1;
         if let Some(parent) = by_id.get(&parent_id) {
-            if parent.attribute == 1 {
+            if parent.attribute == ATTR_FOLDER {
                 parts.push(parent.name.clone());
             }
             parent_id = parent.parent_id.clone();
@@ -100,6 +105,10 @@ fn build_playlist_path(playlist: &RawPlaylist, by_id: &HashMap<String, &RawPlayl
 
     parts.reverse();
     parts.join(" / ")
+}
+
+fn is_user_playlist(attribute: i64) -> bool {
+    attribute == ATTR_PLAYLIST
 }
 
 pub fn filter_by_playlist(
@@ -137,4 +146,16 @@ pub fn sort_tracks(tracks: &mut [Track], sort_by: &str, sort_dir: &str) {
             ord.reverse()
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_playlist_includes_normal_only() {
+        assert!(is_user_playlist(ATTR_PLAYLIST));
+        assert!(!is_user_playlist(ATTR_FOLDER));
+        assert!(!is_user_playlist(ATTR_SMART_PLAYLIST));
+    }
 }

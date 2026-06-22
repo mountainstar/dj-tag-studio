@@ -101,4 +101,7 @@ pub struct RekordboxStatus {
     pub db_path: Option<String>,
     pub db_found: bool,
     pub demo_mode: bool,
+    pub default_db_path: Option<String>,
+    pub custom_db_path: Option<String>,
+    pub using_custom_path: bool,
 }

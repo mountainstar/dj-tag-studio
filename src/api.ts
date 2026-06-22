@@ -1,8 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  DbConnectionTest,
   LibraryState,
   MyTagDef,
   RekordboxStatus,
+  SettingsView,
   TagGroup,
   TagPack,
   TagSuggestion,
@@ -11,6 +13,11 @@ import type {
 
 export const api = {
   getRekordboxStatus: () => invoke<RekordboxStatus>("get_rekordbox_status"),
+  getSettings: () => invoke<SettingsView>("get_settings"),
+  saveSettings: (customMasterDbPath: string | null) =>
+    invoke<SettingsView>("save_settings", { customMasterDbPath }),
+  testDbConnection: (path: string) =>
+    invoke<DbConnectionTest>("test_db_connection", { path }),
   loadLibrary: () => invoke<LibraryState>("load_library"),
   getLibrary: () => invoke<LibraryState>("get_library"),
   getDefaultTagPack: () => invoke<TagPack>("get_default_tag_pack"),

@@ -60,6 +60,23 @@ export interface RekordboxStatus {
   db_path: string | null;
   db_found: boolean;
   demo_mode: boolean;
+  default_db_path?: string | null;
+  custom_db_path?: string | null;
+  using_custom_path?: boolean;
+}
+
+export interface SettingsView {
+  custom_master_db_path: string | null;
+  default_master_db_path: string | null;
+  resolved_master_db_path: string | null;
+  settings_file_path: string;
+}
+
+export interface DbConnectionTest {
+  ok: boolean;
+  path: string;
+  track_count: number | null;
+  message: string;
 }
 
 export interface TagPack {
