@@ -14,13 +14,20 @@ struct RawPlaylist {
     name: String,
     parent_id: String,
     attribute: i64,
+    smart_list: String,
     seq: i64,
 }
 
 pub fn load_playlists(db: &RekordboxDb) -> Result<(Vec<Playlist>, HashMap<String, HashSet<String>>), DbError> {
     let mut stmt = db.conn.prepare(
         r#"
-        SELECT ID, COALESCE(Name, ''), COALESCE(ParentID, ''), COALESCE(Attribute, 0), COALESCE(Seq, 0)
+        SELECT
+            ID,
+            COALESCE(Name, ''),
+            COALESCE(ParentID, ''),
+            COALESCE(Attribute, 0),
+            COALESCE(SmartList, ''),
+            COALESCE(Seq, 0)
         FROM djmdPlaylist
         WHERE COALESCE(rb_local_deleted, 0) = 0
         ORDER BY COALESCE(Seq, 0), Name COLLATE NOCASE
@@ -34,7 +41,8 @@ pub fn load_playlists(db: &RekordboxDb) -> Result<(Vec<Playlist>, HashMap<String
                 name: row.get(1)?,
                 parent_id: row.get(2)?,
                 attribute: row.get(3)?,
-                seq: row.get(4)?,
+                smart_list: row.get(4)?,
+                seq: row.get(5)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -63,7 +71,7 @@ pub fn load_playlists(db: &RekordboxDb) -> Result<(Vec<Playlist>, HashMap<String
     let by_id: HashMap<String, &RawPlaylist> = rows.iter().map(|p| (p.id.clone(), p)).collect();
     let mut playlists: Vec<Playlist> = rows
         .iter()
-        .filter(|p| is_user_playlist(p.attribute))
+        .filter(|p| is_user_playlist(p.attribute, &p.smart_list))
         .map(|p| {
             let track_count = membership.get(&p.id).map(|s| s.len()).unwrap_or(0);
             Playlist {
@@ -107,8 +115,14 @@ fn build_playlist_path(playlist: &RawPlaylist, by_id: &HashMap<String, &RawPlayl
     parts.join(" / ")
 }
 
-fn is_user_playlist(attribute: i64) -> bool {
-    attribute == ATTR_PLAYLIST
+/// User-selectable playlists: anything that is not a folder or intelligent playlist.
+/// Rekordbox uses `0` for classic playlists and `-128` for many normal playlists in RB 7+.
+fn is_user_playlist(attribute: i64, smart_list: &str) -> bool {
+    attribute != ATTR_FOLDER && !is_intelligent_playlist(attribute, smart_list)
+}
+
+fn is_intelligent_playlist(attribute: i64, smart_list: &str) -> bool {
+    attribute == ATTR_SMART_PLAYLIST || !smart_list.trim().is_empty()
 }
 
 pub fn filter_by_playlist(
@@ -154,8 +168,10 @@ mod tests {
 
     #[test]
     fn user_playlist_includes_normal_only() {
-        assert!(is_user_playlist(ATTR_PLAYLIST));
-        assert!(!is_user_playlist(ATTR_FOLDER));
-        assert!(!is_user_playlist(ATTR_SMART_PLAYLIST));
+        assert!(is_user_playlist(ATTR_PLAYLIST, ""));
+        assert!(is_user_playlist(-128, ""));
+        assert!(!is_user_playlist(ATTR_FOLDER, ""));
+        assert!(!is_user_playlist(ATTR_SMART_PLAYLIST, ""));
+        assert!(!is_user_playlist(ATTR_PLAYLIST, "<SmartList/>"));
     }
 }

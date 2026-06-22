@@ -30,7 +30,8 @@ pub fn open_demo_db() -> Connection {
             ID TEXT PRIMARY KEY, UUID TEXT, rb_data_status INTEGER DEFAULT 0,
             rb_local_data_status INTEGER DEFAULT 0, rb_local_deleted INTEGER DEFAULT 0,
             rb_local_synced INTEGER DEFAULT 0, usn INTEGER DEFAULT 1, rb_local_usn INTEGER DEFAULT 1,
-            created_at TEXT, updated_at TEXT, Seq INTEGER, Name TEXT, Attribute INTEGER, ParentID TEXT
+            created_at TEXT, updated_at TEXT, Seq INTEGER, Name TEXT, Attribute INTEGER, ParentID TEXT,
+            SmartList TEXT
         );
         CREATE TABLE djmdSongPlaylist (
             ID TEXT PRIMARY KEY, UUID TEXT, rb_data_status INTEGER DEFAULT 0,
