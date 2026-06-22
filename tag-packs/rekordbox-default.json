@@ -1,0 +1,54 @@
+{
+  "name": "Rekordbox Default",
+  "version": "1.0.0",
+  "groups": [
+    {
+      "name": "Genre",
+      "tags": [
+        "House",
+        "Techno",
+        "Hip-Hop",
+        "Latin",
+        "Afro",
+        "Arabic",
+        "Pop",
+        "R&B",
+        "Disco",
+        "DnB",
+        "Electronic",
+        "Soul",
+        "Desi",
+        "East-Asian"
+      ]
+    },
+    {
+      "name": "Components",
+      "tags": [
+        "Vocals",
+        "No-Vocals",
+        "Bass-Heavy",
+        "Piano",
+        "Horns",
+        "Cowbell",
+        "Synth",
+        "Percussion"
+      ]
+    },
+    {
+      "name": "Situation",
+      "tags": [
+        "Warm-Up",
+        "Peak-Time",
+        "Closing",
+        "Opening-Set",
+        "Wedding",
+        "Corporate",
+        "After-Hours"
+      ]
+    },
+    {
+      "name": "Energy",
+      "tags": ["Start", "Build", "Peak", "Sustain", "Release"]
+    }
+  ]
+}
