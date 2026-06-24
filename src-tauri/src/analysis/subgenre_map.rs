@@ -336,6 +336,7 @@ mod tests {
             rating: 0,
             comment: String::new(),
             tag_ids: vec![],
+            ..Default::default()
         };
         let pending = subgenre_genre_suggestions(&track, &groups, &[], &AudioFeatures::default());
         assert_eq!(pending.len(), 1);

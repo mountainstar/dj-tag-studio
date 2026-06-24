@@ -24,10 +24,48 @@ pub struct Track {
     pub album: String,
     pub genre: String,
     pub bpm: f64,
+    /// Rekordbox `FolderPath` (may be a cloud virtual path).
     pub path: String,
+    /// Best local path for preview/analysis when available.
+    #[serde(default)]
+    pub playback_path: String,
+    #[serde(default)]
+    pub playback_available: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub playback_note: Option<String>,
     pub rating: i64,
     pub comment: String,
     pub tag_ids: Vec<String>,
+}
+
+impl Track {
+    pub fn file_path(&self) -> &str {
+        if !self.playback_path.is_empty() {
+            &self.playback_path
+        } else {
+            &self.path
+        }
+    }
+}
+
+impl Default for Track {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            title: String::new(),
+            artist: String::new(),
+            album: String::new(),
+            genre: String::new(),
+            bpm: 0.0,
+            path: String::new(),
+            playback_path: String::new(),
+            playback_available: false,
+            playback_note: None,
+            rating: 0,
+            comment: String::new(),
+            tag_ids: vec![],
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

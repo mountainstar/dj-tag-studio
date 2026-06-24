@@ -20,6 +20,9 @@ export interface Track {
   genre: string;
   bpm: number;
   path: string;
+  playback_path: string;
+  playback_available: boolean;
+  playback_note?: string | null;
   rating: number;
   comment: string;
   tag_ids: string[];

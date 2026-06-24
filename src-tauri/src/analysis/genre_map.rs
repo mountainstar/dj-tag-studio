@@ -143,13 +143,20 @@ fn genre_keywords(tag: &str) -> Vec<(&'static str, f64)> {
             ("neurofunk", 0.85),
             ("liquid dnb", 0.85),
         ],
+        "Breakbeat" => vec![
+            ("breakbeat", 0.94),
+            ("breakbeats", 0.92),
+            ("breaks", 0.88),
+            ("big beat", 0.9),
+            ("bigbeat", 0.9),
+            ("nu skool breaks", 0.86),
+        ],
         "Electronic" => vec![
             ("electronic", 0.85),
             ("edm", 0.82),
             ("trance", 0.85),
             ("dubstep", 0.85),
             ("garage", 0.78),
-            ("breakbeat", 0.8),
             ("idm", 0.75),
         ],
         "Soul" => vec![

@@ -1,4 +1,5 @@
 mod audio;
+mod comment_map;
 mod components_map;
 mod energy_map;
 mod genre_map;
@@ -14,6 +15,9 @@ use std::sync::{LazyLock, Mutex};
 use crate::types::{MyTagDef, TagGroup, TagSuggestion, Track};
 
 use audio::{analyze_path, AudioFeatures};
+use comment_map::{
+    comment_genre_create_suggestions, match_comment_hints, merge_with_comment_hint,
+};
 use components_map::{component_fallback, pick_components, score_component_tag};
 use energy_map::{energy_fallback, score_energy_tag};
 use genre_map::score_genre_tag;
@@ -23,6 +27,7 @@ use situation_map::{score_situation_tag, situation_fallback as native_situation_
 use subgenre_map::{
     classic_house_signals, score_subgenre_tag, subgenre_genre_suggestions,
 };
+use unmapped::{genre_field_needs_new_tag, should_offer_existing_genre_pick};
 
 static AUDIO_CACHE: LazyLock<Mutex<HashMap<String, AudioFeatures>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -33,7 +38,8 @@ const FALLBACK_CONFIDENCE: f64 = 0.38;
 
 pub fn suggest_tags(track: &Track, groups: &[TagGroup]) -> Vec<TagSuggestion> {
     let signals = TrackSignals::from_track(track);
-    let audio = cached_audio_features(&track.path);
+    let audio = cached_audio_features(track.file_path());
+    let comment_hints = match_comment_hints(track, groups);
     let existing: std::collections::HashSet<_> = track.tag_ids.iter().cloned().collect();
 
     let mut out = Vec::new();
@@ -57,6 +63,13 @@ pub fn suggest_tags(track: &Track, groups: &[TagGroup]) -> Vec<TagSuggestion> {
                 } else {
                     score_tag(&group.name, &tag.name, &signals, &audio)
                 };
+                let (confidence, reason) = merge_with_comment_hint(
+                    confidence,
+                    reason,
+                    &comment_hints,
+                    &group.name,
+                    &tag.name,
+                );
                 TagSuggestion {
                     track_id: track.id.clone(),
                     tag_id: tag.id.clone(),
@@ -102,6 +115,7 @@ pub fn suggest_tags(track: &Track, groups: &[TagGroup]) -> Vec<TagSuggestion> {
                 .take(MAX_PER_GROUP)
                 .collect();
             if group.name == "Genre" {
+                genre_picked.retain(|s| should_offer_existing_genre_pick(&s.tag_name, &signals, groups));
                 genre_picked = refine_genre_picks(genre_picked, &signals);
             }
             genre_picked
@@ -109,23 +123,31 @@ pub fn suggest_tags(track: &Track, groups: &[TagGroup]) -> Vec<TagSuggestion> {
 
         // Always include at least one tag per category
         if picked.is_empty() {
-            if let Some(fallback) = category_fallback(&group.name, &available, &signals, &audio, track) {
-                picked.push(fallback);
+            if let Some(fallback) = category_fallback(&group.name, &available, &signals, &audio, track, groups) {
+                if group.name != "Genre"
+                    || should_offer_existing_genre_pick(&fallback.tag_name, &signals, groups)
+                {
+                    picked.push(fallback);
+                }
             } else if let Some(best) = scored.iter().max_by(|a, b| {
                 a.confidence
                     .partial_cmp(&b.confidence)
                     .unwrap_or(std::cmp::Ordering::Equal)
             }) {
-                picked.push(TagSuggestion {
-                    confidence: best.confidence.max(FALLBACK_CONFIDENCE),
-                    reason: if best.reason.is_empty() {
-                        format!("Best available match for {}", group.name)
-                    } else {
-                        best.reason.clone()
-                    },
-                    pending_create: false,
-                    ..best.clone()
-                });
+                if group.name != "Genre"
+                    || should_offer_existing_genre_pick(&best.tag_name, &signals, groups)
+                {
+                    picked.push(TagSuggestion {
+                        confidence: best.confidence.max(FALLBACK_CONFIDENCE),
+                        reason: if best.reason.is_empty() {
+                            format!("Best available match for {}", group.name)
+                        } else {
+                            best.reason.clone()
+                        },
+                        pending_create: false,
+                        ..best.clone()
+                    });
+                }
             }
         } else if picked.len() < MAX_PER_GROUP {
             // Room for a second tag in this category when scores support it.
@@ -136,6 +158,7 @@ pub fn suggest_tags(track: &Track, groups: &[TagGroup]) -> Vec<TagSuggestion> {
 
     // Propose creating tags for Rekordbox genres not in the schema
     out.extend(unmapped::unmapped_genre_suggestions(track, groups, &out));
+    out.extend(comment_genre_create_suggestions(track, groups, &out));
     out.extend(region_genre_suggestions(track, groups, &out));
     let subgenre = subgenre_genre_suggestions(track, groups, &out, &audio);
     if subgenre
@@ -250,9 +273,6 @@ fn score_generic(tag: &str, s: &TrackSignals) -> (f64, String) {
 }
 
 fn genre_fallback(s: &TrackSignals) -> (&'static str, String) {
-    if !s.genre_field.is_empty() {
-        return ("Electronic", format!("default: unmapped genre '{}'", s.genre_field));
-    }
     let bpm = s.bpm;
     if bpm >= 170.0 {
         return ("DnB", format!("default: fast BPM ({bpm:.0}) → DnB"));
@@ -285,9 +305,27 @@ fn category_fallback(
     signals: &TrackSignals,
     audio: &AudioFeatures,
     track: &Track,
+    groups: &[TagGroup],
 ) -> Option<TagSuggestion> {
     let tag = match group_name {
         "Genre" => {
+            if genre_field_needs_new_tag(signals, groups) {
+                return None;
+            }
+            if !signals.genre_field.is_empty() {
+                let field = signals.genre_field.trim();
+                if let Some(tag) = find_tag(available, field) {
+                    return Some(TagSuggestion {
+                        track_id: track.id.clone(),
+                        tag_id: tag.id.clone(),
+                        tag_name: tag.name.clone(),
+                        group_name: group_name.to_string(),
+                        confidence: 0.9,
+                        reason: format!("Rekordbox genre is '{field}'"),
+                        pending_create: false,
+                    });
+                }
+            }
             let (name, reason) = genre_fallback(signals);
             find_tag_preferred(available, &[name, "Electronic", "House"])
                 .map(|t| (t, reason))
@@ -523,6 +561,7 @@ mod tests {
             rating: 0,
             comment: String::new(),
             tag_ids: vec![],
+            ..Default::default()
         }
     }
 
@@ -545,6 +584,46 @@ mod tests {
     }
 
     #[test]
+    fn suggests_tags_from_comment_field() {
+        let groups = vec![
+            genre_group(),
+            components_group(),
+            situation_group(),
+            energy_group(),
+        ];
+        let track = Track {
+            id: "2".into(),
+            title: "Talk To You".into(),
+            artist: "ANOTR".into(),
+            album: String::new(),
+            genre: "House".into(),
+            bpm: 126.0,
+            path: "/nonexistent.mp3".into(),
+            rating: 100,
+            comment: "House Driving Vocals".into(),
+            tag_ids: vec![],
+            ..Default::default()
+        };
+        let suggestions = suggest_tags(&track, &groups);
+        assert!(
+            suggestions
+                .iter()
+                .any(|s| s.tag_name == "Vocal" && s.reason.contains("comments")),
+            "expected Vocal from comment hints, got {:?}",
+            suggestions
+                .iter()
+                .map(|s| (&s.tag_name, &s.reason))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            suggestions
+                .iter()
+                .any(|s| s.tag_name == "House" && s.reason.contains("comments")),
+            "expected House from comment hints"
+        );
+    }
+
+    #[test]
     fn suggests_house_from_genre_field() {
         let groups = vec![genre_group(), components_group()];
         let track = Track {
@@ -558,6 +637,7 @@ mod tests {
             rating: 100,
             comment: "Driving Vocals".into(),
             tag_ids: vec![],
+            ..Default::default()
         };
         let suggestions = suggest_tags(&track, &groups);
         assert!(suggestions.iter().any(|s| s.tag_name == "House"));
@@ -578,6 +658,7 @@ mod tests {
             rating: 0,
             comment: String::new(),
             tag_ids: vec![],
+            ..Default::default()
         };
         let suggestions = suggest_tags(&track, &groups);
         assert!(suggestions.iter().any(|s| s.tag_name == "Acap"));
@@ -602,6 +683,7 @@ mod tests {
             rating: 0,
             comment: String::new(),
             tag_ids: vec![],
+            ..Default::default()
         };
         let suggestions = suggest_tags(&track, &groups);
         let names: Vec<_> = suggestions.iter().map(|s| s.tag_name.as_str()).collect();
@@ -616,6 +698,64 @@ mod tests {
         assert!(
             !names.contains(&"House"),
             "generic House should yield to Classic House, got {names:?}"
+        );
+    }
+
+    #[test]
+    fn alpine_air_suggests_rekordbox_genre_when_missing_from_schema() {
+        let groups = vec![
+            TagGroup {
+                id: "g1".into(),
+                name: "Genre".into(),
+                seq: 1,
+                tags: vec![
+                    MyTagDef {
+                        id: "t1".into(),
+                        name: "House".into(),
+                        group_id: "g1".into(),
+                        seq: 1,
+                    },
+                    MyTagDef {
+                        id: "t2".into(),
+                        name: "Techno".into(),
+                        group_id: "g1".into(),
+                        seq: 2,
+                    },
+                ],
+            },
+            components_group(),
+            situation_group(),
+            energy_group(),
+        ];
+        let track = Track {
+            id: "alpine".into(),
+            title: "Alpine Air (Original Mix)".into(),
+            artist: "N1NJA".into(),
+            album: String::new(),
+            genre: "Melodic House & Techno".into(),
+            bpm: 128.0,
+            path: "/nonexistent.mp3".into(),
+            rating: 0,
+            comment: String::new(),
+            tag_ids: vec![],
+            ..Default::default()
+        };
+        let suggestions = suggest_tags(&track, &groups);
+        assert!(
+            suggestions.iter().any(|s| {
+                s.group_name == "Genre"
+                    && s.tag_name == "Melodic House & Techno"
+                    && s.pending_create
+            }),
+            "expected Melodic House & Techno pending create, got {:?}",
+            suggestions
+                .iter()
+                .map(|s| (&s.group_name, &s.tag_name, s.pending_create))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            !suggestions.iter().any(|s| s.tag_name == "House" && !s.pending_create),
+            "should not suggest generic House when genre field is more specific"
         );
     }
 }

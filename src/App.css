@@ -13,12 +13,18 @@ body {
   margin: 0;
   min-height: 100vh;
   background: #0f0f14;
+  overflow: hidden;
 }
 
 .app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-chrome {
+  flex-shrink: 0;
 }
 
 header {
@@ -169,10 +175,12 @@ header p {
   grid-template-columns: 1fr 320px 240px;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .library-table {
   overflow: auto;
+  min-height: 0;
   border-right: 1px solid #222;
 }
 
@@ -197,6 +205,7 @@ header p {
   color: #888;
   cursor: pointer;
   user-select: none;
+  z-index: 1;
 }
 
 .library-table th:hover {
@@ -221,6 +230,7 @@ header p {
 
 .tag-panel {
   overflow: auto;
+  min-height: 0;
   padding: 0.75rem;
   border-right: 1px solid #222;
 }
@@ -274,6 +284,7 @@ header p {
 .preview {
   padding: 0.75rem;
   overflow: auto;
+  min-height: 0;
 }
 
 .preview h3 {
@@ -302,6 +313,13 @@ header p {
 audio {
   width: 100%;
   margin: 0.5rem 0;
+}
+
+.playback-note {
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
+  color: #fbbf24;
+  line-height: 1.35;
 }
 
 button {

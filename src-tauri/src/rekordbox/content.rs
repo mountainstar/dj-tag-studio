@@ -3,8 +3,11 @@ use std::collections::HashMap;
 use crate::types::Track;
 
 use super::db::{DbError, RekordboxDb};
+use super::paths::{rekordbox_share_root, resolve_playback_path};
 
 pub fn load_tracks(db: &RekordboxDb) -> Result<Vec<Track>, DbError> {
+    let share_root = rekordbox_share_root();
+
     let mut stmt = db.conn.prepare(
         r#"
         SELECT
@@ -15,6 +18,8 @@ pub fn load_tracks(db: &RekordboxDb) -> Result<Vec<Track>, DbError> {
             COALESCE(g.Name, ''),
             COALESCE(c.BPM, 0),
             COALESCE(c.FolderPath, ''),
+            COALESCE(c.OrgFolderPath, ''),
+            COALESCE(c.rb_LocalFolderPath, ''),
             COALESCE(c.Rating, 0),
             COALESCE(c.Commnt, '')
         FROM djmdContent c
@@ -36,8 +41,10 @@ pub fn load_tracks(db: &RekordboxDb) -> Result<Vec<Track>, DbError> {
                 row.get::<_, String>(4)?,
                 row.get::<_, i64>(5)?,
                 row.get::<_, String>(6)?,
-                row.get::<_, i64>(7)?,
+                row.get::<_, String>(7)?,
                 row.get::<_, String>(8)?,
+                row.get::<_, i64>(9)?,
+                row.get::<_, String>(10)?,
             ))
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -63,17 +70,28 @@ pub fn load_tracks(db: &RekordboxDb) -> Result<Vec<Track>, DbError> {
     Ok(track_rows
         .into_iter()
         .map(
-            |(id, title, artist, album, genre, bpm_raw, path, rating, comment)| Track {
-                id: id.clone(),
-                title,
-                artist,
-                album,
-                genre,
-                bpm: bpm_raw as f64 / 100.0,
-                path,
-                rating,
-                comment,
-                tag_ids: tags_by_track.remove(&id).unwrap_or_default(),
+            |(id, title, artist, album, genre, bpm_raw, folder_path, org_path, local_path, rating, comment)| {
+                let playback = resolve_playback_path(
+                    &folder_path,
+                    &org_path,
+                    &local_path,
+                    share_root.as_deref(),
+                );
+                Track {
+                    id: id.clone(),
+                    title,
+                    artist,
+                    album,
+                    genre,
+                    bpm: bpm_raw as f64 / 100.0,
+                    path: folder_path,
+                    playback_path: playback.path,
+                    playback_available: playback.available,
+                    playback_note: playback.note,
+                    rating,
+                    comment,
+                    tag_ids: tags_by_track.remove(&id).unwrap_or_default(),
+                }
             },
         )
         .collect())
@@ -128,6 +146,7 @@ pub fn search_tracks(tracks: &[Track], query: &str) -> Vec<Track> {
                 || t.album.to_lowercase().contains(&q)
                 || t.genre.to_lowercase().contains(&q)
                 || t.path.to_lowercase().contains(&q)
+                || t.playback_path.to_lowercase().contains(&q)
         })
         .cloned()
         .collect()

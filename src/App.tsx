@@ -359,75 +359,77 @@ function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>DJ Tag Studio</h1>
-        <p>Rekordbox My Tag accelerator</p>
-      </header>
+      <div className="app-chrome">
+        <header>
+          <h1>DJ Tag Studio</h1>
+          <p>Rekordbox My Tag accelerator</p>
+        </header>
 
-      <RekordboxStatusBar
-        onReload={handleReload}
-        reloading={reloading}
-        onOpenSettings={() => setShowSettings(true)}
-      />
-
-      {error && <div className="error-banner">{error}</div>}
-
-      <BatchToolbar
-        selectedCount={selectedIds.size || (selectedId ? 1 : 0)}
-        pendingCount={pendingCount}
-        rekordboxRunning={Boolean(library?.rekordbox_running && !library.demo_mode)}
-        onSuggest={handleSuggest}
-        onCommit={handleCommit}
-        onApplyLayout={handleApplyLayout}
-        canWrite={canWrite}
-        writeDisabledReason={writeDisabledReason}
-        suggesting={suggesting}
-        busy={writing}
-      />
-
-      {writing && (
-        <div className="writing-banner">Writing to Rekordbox…</div>
-      )}
-
-      <div className="filters">
-        <input
-          type="search"
-          placeholder="Search title, artist, genre…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+        <RekordboxStatusBar
+          onReload={handleReload}
+          reloading={reloading}
+          onOpenSettings={() => setShowSettings(true)}
         />
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-          <option value="all">All tracks</option>
-          <option value="untagged">Untagged only</option>
-        </select>
-        <select
-          value={playlistId}
-          onChange={(e) => setPlaylistId(e.target.value)}
-          className="playlist-select"
-        >
-          <option value="">All playlists</option>
-          {library?.playlists.map((pl) => (
-            <option key={pl.id} value={pl.id}>
-              {pl.path} ({pl.track_count})
-            </option>
-          ))}
-        </select>
-        <button type="button" onClick={() => setShowSettings(true)}>
-          Settings
-        </button>
-        <button type="button" onClick={() => setShowSchema(true)}>
-          Manage tags
-        </button>
-        {suggestions.length > 0 && (
-          <>
-            <button type="button" className="primary" onClick={handleAcceptSuggestions}>
-              Accept {suggestions.length} suggestions
-            </button>
-            <button type="button" className="deny-btn" onClick={handleRejectSuggestions}>
-              Deny all
-            </button>
-          </>
+
+        {error && <div className="error-banner">{error}</div>}
+
+        <BatchToolbar
+          selectedCount={selectedIds.size || (selectedId ? 1 : 0)}
+          pendingCount={pendingCount}
+          rekordboxRunning={Boolean(library?.rekordbox_running && !library.demo_mode)}
+          onSuggest={handleSuggest}
+          onCommit={handleCommit}
+          onApplyLayout={handleApplyLayout}
+          canWrite={canWrite}
+          writeDisabledReason={writeDisabledReason}
+          suggesting={suggesting}
+          busy={writing}
+        />
+
+        {writing && (
+          <div className="writing-banner">Writing to Rekordbox…</div>
         )}
+
+        <div className="filters">
+          <input
+            type="search"
+            placeholder="Search title, artist, genre…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="all">All tracks</option>
+            <option value="untagged">Untagged only</option>
+          </select>
+          <select
+            value={playlistId}
+            onChange={(e) => setPlaylistId(e.target.value)}
+            className="playlist-select"
+          >
+            <option value="">All playlists</option>
+            {library?.playlists.map((pl) => (
+              <option key={pl.id} value={pl.id}>
+                {pl.path} ({pl.track_count})
+              </option>
+            ))}
+          </select>
+          <button type="button" onClick={() => setShowSettings(true)}>
+            Settings
+          </button>
+          <button type="button" onClick={() => setShowSchema(true)}>
+            Manage tags
+          </button>
+          {suggestions.length > 0 && (
+            <>
+              <button type="button" className="primary" onClick={handleAcceptSuggestions}>
+                Accept {suggestions.length} suggestions
+              </button>
+              <button type="button" className="deny-btn" onClick={handleRejectSuggestions}>
+                Deny all
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <main className="layout">
@@ -462,12 +464,17 @@ function App() {
                   ? `${Math.round(selectedTrack.bpm)} BPM`
                   : "No BPM"}
               </p>
-              {selectedTrack.path && (
+              {selectedTrack.playback_available && selectedTrack.playback_path ? (
                 <audio
-                  key={selectedTrack.path}
+                  key={selectedTrack.playback_path}
                   controls
-                  src={convertFileSrc(selectedTrack.path)}
+                  src={convertFileSrc(selectedTrack.playback_path)}
                 />
+              ) : (
+                <p className="playback-note">
+                  {selectedTrack.playback_note ||
+                    "Preview unavailable for this track."}
+                </p>
               )}
               <p className="comment">{selectedTrack.comment || "No comments"}</p>
               <SuggestionsPanel

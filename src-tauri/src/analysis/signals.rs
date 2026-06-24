@@ -32,7 +32,7 @@ impl TrackSignals {
             track.comment.clone(),
         ];
 
-        if let Some(file_tags) = read_embedded_tags(&track.path) {
+        if let Some(file_tags) = read_embedded_tags(track.file_path()) {
             parts.push(file_tags.genre);
             parts.push(file_tags.comment);
             parts.push(file_tags.grouping);
@@ -40,8 +40,8 @@ impl TrackSignals {
             parts.push(file_tags.artist);
         }
 
-        let path_tokens = path_to_tokens(&track.path);
-        let path_folders = path_folder_tokens(&track.path);
+        let path_tokens = path_to_tokens(track.file_path());
+        let path_folders = path_folder_tokens(track.file_path());
         parts.push(path_tokens.clone());
         parts.push(path_folders.clone());
 
@@ -57,7 +57,7 @@ impl TrackSignals {
             raw_title: track.title.clone(),
             raw_artist: track.artist.clone(),
             raw_album: track.album.clone(),
-            raw_path: track.path.clone(),
+            raw_path: track.file_path().to_string(),
         }
     }
 
@@ -140,6 +140,10 @@ struct EmbeddedTags {
     genre: String,
     comment: String,
     grouping: String,
+}
+
+pub fn read_embedded_comment(path: &str) -> Option<String> {
+    read_embedded_tags(path).map(|t| t.comment)
 }
 
 fn read_embedded_tags(path: &str) -> Option<EmbeddedTags> {

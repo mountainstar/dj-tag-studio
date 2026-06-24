@@ -21,7 +21,8 @@ pub fn open_demo_db() -> Connection {
         );
         CREATE TABLE djmdContent (
             ID TEXT PRIMARY KEY, Title TEXT, ArtistID TEXT, AlbumID TEXT, GenreID TEXT,
-            BPM INTEGER, FolderPath TEXT, Rating INTEGER, Commnt TEXT, rb_local_deleted INTEGER DEFAULT 0
+            BPM INTEGER, FolderPath TEXT, OrgFolderPath TEXT, rb_LocalFolderPath TEXT,
+            Rating INTEGER, Commnt TEXT, rb_local_deleted INTEGER DEFAULT 0
         );
         CREATE TABLE djmdArtist (ID TEXT PRIMARY KEY, Name TEXT);
         CREATE TABLE djmdAlbum (ID TEXT PRIMARY KEY, Name TEXT);
@@ -89,7 +90,7 @@ pub fn open_demo_db() -> Connection {
         )
         .unwrap();
         conn.execute(
-            "INSERT INTO djmdContent (ID, Title, ArtistID, AlbumID, GenreID, BPM, FolderPath, Rating, Commnt) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO djmdContent (ID, Title, ArtistID, AlbumID, GenreID, BPM, FolderPath, OrgFolderPath, Rating, Commnt) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, ?8, ?9)",
             params![id, title, format!("a-{id}"), format!("al-{id}"), format!("g-{id}"), bpm, path, rating, comment],
         )
         .unwrap();
