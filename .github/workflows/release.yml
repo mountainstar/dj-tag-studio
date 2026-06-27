@@ -27,6 +27,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install OpenSSL (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          choco install openssl --version=3.3.2 -y --no-progress
+          Add-Content $env:GITHUB_ENV "OPENSSL_DIR=C:\Program Files\OpenSSL-Win64"
+          Add-Content $env:GITHUB_ENV "OPENSSL_LIB_DIR=C:\Program Files\OpenSSL-Win64\lib"
+          Add-Content $env:GITHUB_ENV "OPENSSL_INCLUDE_DIR=C:\Program Files\OpenSSL-Win64\include"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -35,8 +44,10 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rust_target }}
+
+      - name: Add Rust target
+        if: matrix.rust_target != ''
+        run: rustup target add ${{ matrix.rust_target }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
