@@ -30,7 +30,6 @@ use types::{
 struct AppState {
     library: Mutex<Option<LibraryState>>,
     session: Mutex<TagSession>,
-    demo_mode: Mutex<bool>,
     playlist_tracks: Mutex<HashMap<String, HashSet<String>>>,
     write_lock: Mutex<()>,
     settings: Mutex<AppSettings>,
@@ -259,12 +258,13 @@ fn perform_commit(state: &AppState) -> Result<CommitSummary, String> {
         TagSession::collapse_pending(&session.pending)
     };
 
-    let lib = state.library.lock().unwrap();
-    let lib = lib.as_ref().ok_or("Library not loaded")?;
-    if lib.demo_mode {
-        return Err("Demo mode cannot commit to Rekordbox".into());
+    {
+        let lib = state.library.lock().unwrap();
+        let lib = lib.as_ref().ok_or("Library not loaded")?;
+        if lib.demo_mode {
+            return Err("Demo mode cannot commit to Rekordbox".into());
+        }
     }
-    drop(lib);
 
     write_changes_to_db(state, &pending, true)
 }
@@ -304,7 +304,7 @@ fn write_changes_to_db(
     let mut db = open_database(&path, DatabaseMode::ReadWrite).map_err(|e| e.to_string())?;
 
     let (tracks_changed, tags_added, tags_removed) =
-        commit_changes(&mut db, changes, &groups).map_err(|e| format_db_error(e))?;
+        commit_changes(&mut db, changes, &groups).map_err(|e| format_db_error(e, Some(&db)))?;
 
     let changed_track_ids: Vec<String> = changes
         .iter()
@@ -338,8 +338,14 @@ fn write_changes_to_db(
     })
 }
 
-fn format_db_error(err: DbError) -> String {
-    let msg = err.to_string();
+fn format_db_error(err: DbError, db: Option<&rekordbox::db::RekordboxDb>) -> String {
+    let mut msg = err.to_string();
+    if let Some(db) = db {
+        msg = format!("{} [{}]", msg, db.database_path().display());
+        if db.is_read_only() {
+            msg = format!("{msg} (read-only)");
+        }
+    }
     if msg.contains("database is locked") || msg.contains("SQLITE_BUSY") {
         format!(
             "{msg}. Quit Rekordbox completely (including any Pioneer background processes) and try again."
@@ -514,7 +520,7 @@ fn ensure_custom_tag(
     let path = db_path.ok_or("Rekordbox database not found".to_string())?;
     backup_master_db(&path).map_err(|e| e.to_string())?;
     let db = open_database(&path, DatabaseMode::ReadWrite).map_err(|e| e.to_string())?;
-    let def = add_custom_subtag(&db, group_id, name).map_err(|e| format_db_error(e))?;
+    let def = add_custom_subtag(&db, group_id, name).map_err(|e| format_db_error(e, Some(&db)))?;
     lib.groups = load_tag_groups(&db).map_err(|e| e.to_string())?;
     Ok(def)
 }
@@ -679,7 +685,6 @@ pub fn run() {
         .manage(AppState {
             library: Mutex::new(None),
             session: Mutex::new(TagSession::default()),
-            demo_mode: Mutex::new(false),
             playlist_tracks: Mutex::new(HashMap::new()),
             write_lock: Mutex::new(()),
             settings: Mutex::new(AppSettings::load()),

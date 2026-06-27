@@ -412,16 +412,6 @@ fn create_subtag(db: &RekordboxDb, section_id: &str, name: &str, seq: i64) -> Re
     Ok(id)
 }
 
-pub fn tag_name_exists(groups: &[TagGroup], group_id: &str, name: &str) -> bool {
-    let name_lower = name.to_lowercase();
-    groups.iter().any(|g| {
-        g.id == group_id
-            && g.tags
-                .iter()
-                .any(|t| t.name.to_lowercase() == name_lower)
-    })
-}
-
 pub fn add_custom_subtag(
     db: &RekordboxDb,
     group_id: &str,

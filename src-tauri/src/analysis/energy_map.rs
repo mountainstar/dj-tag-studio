@@ -110,7 +110,7 @@ fn score_fun_upbeat(
     signals: &TrackSignals,
     audio: &AudioFeatures,
     bpm: f64,
-    loudness: f64,
+    _loudness: f64,
     combined: f64,
 ) -> (f64, String) {
     if signals.contains_any(&[

@@ -1,4 +1,5 @@
 //! Phase 2: Serato ID3 tag export.
+#![allow(dead_code)]
 //!
 //! Serato stores metadata in standard ID3/Vorbis/MP4 fields plus proprietary
 //! GEOB frames. This module will map Rekordbox My Tags to Serato-compatible

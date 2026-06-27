@@ -69,9 +69,18 @@ pub fn load_playlists(db: &RekordboxDb) -> Result<(Vec<Playlist>, HashMap<String
     }
 
     let by_id: HashMap<String, &RawPlaylist> = rows.iter().map(|p| (p.id.clone(), p)).collect();
-    let mut playlists: Vec<Playlist> = rows
+    let mut user_rows: Vec<&RawPlaylist> = rows
         .iter()
         .filter(|p| is_user_playlist(p.attribute, &p.smart_list))
+        .collect();
+    user_rows.sort_by(|a, b| {
+        a.seq
+            .cmp(&b.seq)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+
+    let mut playlists: Vec<Playlist> = user_rows
+        .into_iter()
         .map(|p| {
             let track_count = membership.get(&p.id).map(|s| s.len()).unwrap_or(0);
             Playlist {
@@ -118,7 +127,12 @@ fn build_playlist_path(playlist: &RawPlaylist, by_id: &HashMap<String, &RawPlayl
 /// User-selectable playlists: anything that is not a folder or intelligent playlist.
 /// Rekordbox uses `0` for classic playlists and `-128` for many normal playlists in RB 7+.
 fn is_user_playlist(attribute: i64, smart_list: &str) -> bool {
-    attribute != ATTR_FOLDER && !is_intelligent_playlist(attribute, smart_list)
+    is_normal_playlist_attribute(attribute)
+        && !is_intelligent_playlist(attribute, smart_list)
+}
+
+fn is_normal_playlist_attribute(attribute: i64) -> bool {
+    attribute == ATTR_PLAYLIST || attribute == -128
 }
 
 fn is_intelligent_playlist(attribute: i64, smart_list: &str) -> bool {

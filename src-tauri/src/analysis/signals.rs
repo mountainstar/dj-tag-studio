@@ -13,7 +13,6 @@ pub struct TrackSignals {
     pub genre_field: String,
     pub bpm: f64,
     pub rating: i64,
-    pub path_tokens: String,
     /// Lowercased parent folder names from the file path (e.g. "bollywood wedding").
     pub path_folders: String,
     pub raw_title: String,
@@ -52,7 +51,6 @@ impl TrackSignals {
             genre_field: track.genre.to_lowercase(),
             bpm: track.bpm,
             rating: track.rating,
-            path_tokens: path_tokens.to_lowercase(),
             path_folders: path_folders.to_lowercase(),
             raw_title: track.title.clone(),
             raw_artist: track.artist.clone(),

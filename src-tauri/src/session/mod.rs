@@ -7,7 +7,6 @@ pub struct TagSession {
     pub pending: Vec<PendingChange>,
     pub undo_stack: Vec<PendingChange>,
     pub redo_stack: Vec<PendingChange>,
-    pub track_overrides: HashMap<String, Vec<String>>,
     dismissed: HashSet<String>,
 }
 

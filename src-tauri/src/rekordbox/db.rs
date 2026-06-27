@@ -73,6 +73,10 @@ fn dirs_home() -> Option<PathBuf> {
 }
 
 pub fn open_database(path: &Path, mode: DatabaseMode) -> Result<RekordboxDb, DbError> {
+    if mode == DatabaseMode::ReadWrite && super::process::is_rekordbox_running() {
+        return Err(DbError::RekordboxRunning);
+    }
+
     if !path.exists() {
         return Err(DbError::NotFound);
     }
@@ -103,8 +107,14 @@ pub fn open_database(path: &Path, mode: DatabaseMode) -> Result<RekordboxDb, DbE
     })
 }
 
-pub fn next_usn(conn: &Connection) -> Result<i64, DbError> {
-    next_local_usn(conn)
+impl RekordboxDb {
+    pub fn database_path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn is_read_only(&self) -> bool {
+        self.mode == DatabaseMode::ReadOnly
+    }
 }
 
 pub fn next_local_usn(conn: &Connection) -> Result<i64, DbError> {
@@ -210,13 +220,6 @@ pub fn touch_content(db: &RekordboxDb, content_id: &str) -> Result<(), DbError> 
 
 pub fn now_timestamp() -> String {
     chrono::Utc::now().format("%Y-%m-%d %H:%M:%S%.3f +00:00").to_string()
-}
-
-pub fn new_id() -> String {
-    format!(
-        "{}",
-        (uuid::Uuid::new_v4().as_u128() % 2_900_000_000) + 1_000_000_000
-    )
 }
 
 /// Rekordbox native My Tags use numeric string IDs, not UUID hex.
