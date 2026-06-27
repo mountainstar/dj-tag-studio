@@ -27,6 +27,16 @@ source ~/.cargo/env
 npm run tauri dev
 ```
 
+## Download
+
+Pre-built installers are on the **[GitHub Releases](https://github.com/mountainstar/dj-tag-studio/releases)** page.
+
+- **macOS (Apple Silicon):** `DJ Tag Studio_*_aarch64.dmg`
+- **macOS (Intel):** `DJ Tag Studio_*_x64.dmg` (when available from CI)
+- **Windows:** `*.msi` (when available from CI)
+
+On first launch, macOS may block the app (unsigned build). Open **System Settings → Privacy & Security** and choose **Open Anyway**.
+
 ## Build installers
 
 ```bash
